@@ -6,7 +6,8 @@ const tokens = (n) => {
 }
 
 describe("Token", ()=> {
-    let token, accounts, deployer, receiver;
+    let token, accounts, deployer, receiver, exchange;
+    const invalidAddress = "0x0000000000000000000000000000000000000000";
 
     beforeEach( async () => {
         const Token = await ethers.getContractFactory("Token");
@@ -14,6 +15,7 @@ describe("Token", ()=> {
         accounts = await ethers.getSigners()
         deployer = accounts[0];
         receiver = accounts[1];
+        exchange = accounts[2];
     })
 
     describe("Deployment", () => {
@@ -77,8 +79,39 @@ describe("Token", ()=> {
 
             it("Rejects invalid recipient", async () => {
                 const amount = tokens(100);
-                const invalidAddress = "0x0000000000000000000000000000000000000000";
                 await expect(token.connect(deployer).transfer(invalidAddress, amount)).to.be.reverted;
+            })
+        })
+    })
+
+    describe("Approving Tokens", () => {
+        let amount, transaction, result;
+
+        beforeEach(async () => {
+            amount = tokens(100);
+            transaction = await token.connect(deployer).approve(exchange.address, amount);
+            result = await transaction.wait();
+        })
+
+        describe("Success", async () => {
+            it("Allocates an allownace for delegated token spending", async () => {
+                expect(await token.allowance(deployer.address, exchange.address)).to.equal(amount);
+            })
+
+            it("Emits an Approval event", async () => {
+                const approvalEvent = result.events[0];
+                expect(approvalEvent.event).to.equal("Approval");
+    
+                const eventArgs = approvalEvent.args;
+                expect(eventArgs._owner).to.equal(deployer.address);
+                expect(eventArgs._spender).to.equal(exchange.address);
+                expect(eventArgs._value).to.equal(amount);
+            })
+        })
+
+        describe("Failure", async () => {
+            it("Rejects invalid spenders", async () => {
+                await expect(token.connect(deployer).approve(invalidAddress, amount)).to.be.reverted;
             })
         })
     })
