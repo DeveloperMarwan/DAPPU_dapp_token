@@ -110,8 +110,57 @@ describe("Token", ()=> {
         })
 
         describe("Failure", async () => {
+            const invalidTokenAmount = tokens(100000000);
+
             it("Rejects invalid spenders", async () => {
                 await expect(token.connect(deployer).approve(invalidAddress, amount)).to.be.reverted;
+            })
+
+            it("Rejects invalid approval amount", async () => {
+                await expect(token.connect(deployer).approve(exchange.address, invalidTokenAmount)).to.be.reverted;
+            })
+        })
+    })
+
+    describe("Delegated Token Transfers", () => {
+        let amount, transaction, result;
+
+        beforeEach(async () => {
+            amount = tokens(100);
+            transaction = await token.connect(deployer).approve(exchange.address, amount);
+            result = await transaction.wait();
+        })
+
+        describe("Success", async () => {
+            beforeEach(async () => {
+                transaction = await token.connect(exchange).transferFrom(deployer.address, receiver.address, amount);
+                result = await transaction.wait();
+            })
+
+            it("Transfers token blanaces", async () => {
+                expect(await token.balanceOf(deployer.address)).to.be.equal(ethers.utils.parseUnits("999900", "ether"));
+                expect(await token.balanceOf(receiver.address)).to.be.equal(amount);
+            })
+            
+            it("Resets the allowance", async () => {
+                expect(await token.allowance(deployer.address, exchange.address)).to.be.equal(0);
+            })
+
+            it("Emits a transfer event", async () => {
+                const transferEvent = result.events[0];
+                expect(transferEvent.event).to.equal("Transfer");
+    
+                const eventArgs = transferEvent.args;
+                expect(eventArgs._from).to.equal(deployer.address);
+                expect(eventArgs._to).to.equal(receiver.address);
+                expect(eventArgs._value).to.equal(amount);
+            })
+
+        })
+        describe("Failure", async () => {
+            const invalidAmount = tokens(200);
+            it("Rejects invalid transfer amount", async () => {
+                await expect(token.connect(exchange).transferFrom(deployer.address, receiver.address, invalidAmount)).to.be.reverted;
             })
         })
     })
