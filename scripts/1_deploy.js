@@ -14,7 +14,7 @@ async function main() {
 //   const lockedAmount = hre.ethers.utils.parseEther("1");
 
   const Token = await hre.ethers.getContractFactory("Token");
-  const token = await Token.deploy();
+  const token = await Token.deploy('Dapp University', 'DAPP', '1000000');
   await token.deployed();
 
   console.log(
